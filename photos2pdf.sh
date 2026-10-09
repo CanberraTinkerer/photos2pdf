@@ -7,10 +7,13 @@ usage() {
 Usage:
   ./photos2pdf.sh [options] [INPUT_DIR] [OUTPUT_PDF]
 
-Convert a directory of JPG/JPEG photos of open book spreads into a cleaned PDF.
-Each input image is treated as a left/right two-page spread.
+Convert a directory of JPG/JPEG photos into a cleaned PDF.
+By default each input image is treated as a left/right two-page spread.
+Use --layout 1 for single-page photos.
 
 Options:
+  --layout N                   Page layout per image: 1 (single page) or
+                               2 (two-page spread). Default: 2
   --dpi N                      Input and output DPI for ScanTailor. Default: 300
   --margin N                   Whitespace margin to preserve around each page.
                                Default: 30
@@ -40,6 +43,7 @@ Options:
 
 Examples:
   ./photos2pdf.sh
+  ./photos2pdf.sh --layout 1 "/path/to/single-page-photos"
   ./photos2pdf.sh "/path/to/book-photos"
   ./photos2pdf.sh --dewarp-off-image IMG_0720.JPG --dewarp-off-image IMG_0723.JPG
   ./photos2pdf.sh --binarize-threshold-offset 0.5 "/path/to/book-photos"
@@ -106,6 +110,7 @@ threshold_image_to_bilevel() {
 
 dpi=300
 margin=30
+layout=2
 dewarping=auto
 depth_perception=2.0
 binarize=1
@@ -120,6 +125,11 @@ dewarp_off_images=()
 
 while (($#)); do
   case "$1" in
+    --layout)
+      (($# >= 2)) || die "--layout requires a value"
+      layout=$2
+      shift 2
+      ;;
     --dpi)
       (($# >= 2)) || die "--dpi requires a value"
       dpi=$2
@@ -235,6 +245,14 @@ case "$dewarping" in
     ;;
 esac
 
+case "$layout" in
+  1|2)
+    ;;
+  *)
+    die "Unsupported --layout mode: $layout (expected 1 or 2)"
+    ;;
+esac
+
 if [ -z "$work_dir" ]; then
   work_dir=$(mktemp -d "${TMPDIR:-/tmp}/photos2pdf.XXXXXX")
   work_dir_is_temp=1
@@ -281,8 +299,7 @@ mapfile -d '' images < <(
 printf '%s\n' "${images[@]}" > "$inputs_manifest"
 
 st_args=(
-  --layout=2
-  --layout-direction=lr
+  --layout="$layout"
   --dpi="$dpi"
   --output-dpi="$dpi"
   --deskew=auto
@@ -296,6 +313,10 @@ st_args=(
   --output-project="$project_file"
 )
 
+if ((layout == 2)); then
+  st_args+=(--layout-direction=lr)
+fi
+
 if ((normalize_illumination)); then
   st_args+=(--normalize-illumination)
 fi
@@ -304,6 +325,7 @@ printf 'Input directory: %s\n' "$input_dir"
 printf 'Output PDF: %s\n' "$output_pdf"
 printf 'Work directory: %s\n' "$work_dir"
 printf 'Source images: %s\n' "${#images[@]}"
+printf 'Layout: %s\n' "$([ "$layout" -eq 1 ] && echo "1 page per image" || echo "2 pages per image (spread)")"
 printf 'Running ScanTailor...\n'
 
 scantailor-universal-cli "${st_args[@]}" "${images[@]}" "$pages_dir"
@@ -327,8 +349,7 @@ if ((${#dewarp_off_images[@]} > 0)); then
 
   mkdir -p "$override_project_dir" "$override_pages_dir"
   override_args=(
-    --layout=2
-    --layout-direction=lr
+    --layout="$layout"
     --dpi="$dpi"
     --output-dpi="$dpi"
     --deskew=auto
@@ -342,6 +363,10 @@ if ((${#dewarp_off_images[@]} > 0)); then
     --output-project="$override_project_file"
   )
 
+  if ((layout == 2)); then
+    override_args+=(--layout-direction=lr)
+  fi
+
   if ((normalize_illumination)); then
     override_args+=(--normalize-illumination)
   fi
@@ -350,8 +375,13 @@ if ((${#dewarp_off_images[@]} > 0)); then
 
   for requested_name in "${dewarp_off_images[@]}"; do
     stem=${requested_name%.*}
-    rm -f "$pages_dir/${stem}_"*.tif
-    mv "$override_pages_dir/${stem}_"*.tif "$pages_dir/"
+    if ((layout == 1)); then
+      rm -f "$pages_dir/${stem}.tif"
+      mv "$override_pages_dir/${stem}.tif" "$pages_dir/"
+    else
+      rm -f "$pages_dir/${stem}_"*.tif
+      mv "$override_pages_dir/${stem}_"*.tif "$pages_dir/"
+    fi
   done
 fi
 

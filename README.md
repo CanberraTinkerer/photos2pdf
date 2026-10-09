@@ -74,6 +74,12 @@ Use the current directory:
 photos2pdf
 ```
 
+Process single-page photos (one page per image):
+
+```bash
+photos2pdf --layout 1 "/path/to/single-page-photos"
+```
+
 Process a specific folder and let the script name the PDF:
 
 ```bash
@@ -113,6 +119,8 @@ photos2pdf --cleanup "/path/to/book-photos"
 Important Options
 -----------------
 
+- `--layout 1|2`
+  Page layout per image: `1` for single page per photo, `2` for two-page spread. Default: `2`
 - `--dpi N`
   Sets both ScanTailor input and output DPI. Default: `300`
 - `--margin N`
@@ -161,7 +169,7 @@ Assumptions and Limitations
 ---------------------------
 
 - Input images must be top-level `.jpg` or `.jpeg` files. The script does not recurse into subdirectories.
-- Each input image is assumed to be a left/right two-page spread.
+- By default each input image is assumed to be a left/right two-page spread. Use `--layout 1` when each image is a single page.
 - Processing order is based on filename sorting, so your filenames need to reflect page order.
 - `--dewarp-off-image` values must match the source image basenames exactly.
 - The default output is meant to be cleaner than raw photos, not archival-perfect reproduction.

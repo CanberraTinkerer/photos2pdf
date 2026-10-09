@@ -3,3 +3,8 @@
 .venv
 .env
 __pycache__
+page 1.jpg
+page 1.pdf
+page1_dewarping_off.pdf
+page1_smaller_margins.pdf
+.gemini/
